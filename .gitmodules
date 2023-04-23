@@ -1,3 +1,6 @@
 [submodule "mingpt"]
 	path = mingpt
 	url = https://github.com/karpathy/minGPT.git
+[submodule "projects/gpt2-tfjs"]
+	path = projects/gpt2-tfjs
+	url = git@github.com:jseeio/gpt2-tfjs.git

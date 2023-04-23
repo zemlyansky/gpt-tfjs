@@ -33,3 +33,6 @@ The testing script relies on minGPT to generate the test data. Before running te
 ```bash
 python test_gen.py
 ```
+
+### Demo
+- [https://jsee.io/gpt2-tfjs/](https://jsee.io/gpt2-tfjs/) - Loading GPT-2 weights from Hugginface and running inference in the browser
