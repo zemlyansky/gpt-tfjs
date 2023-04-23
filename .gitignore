@@ -1,0 +1,6 @@
+coverage/
+node_modules/
+temp/
+test.json
+.swp
+package-lock.json

@@ -1,0 +1,3 @@
+[submodule "mingpt"]
+	path = mingpt
+	url = https://github.com/karpathy/minGPT.git
