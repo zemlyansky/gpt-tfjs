@@ -8,7 +8,7 @@ const {
     MLP,
     Block,
     GPT, GPTLMHeadModel,
-    generate,
+    generate, generateSync
 } = require('./src/model')
 
 const {
@@ -157,12 +157,32 @@ test('Load MinGPT model (sorting)', async () => {
     const logits = model.predict(tf.tensor(tests.model_sort.inputs))
     const mse = tf.losses.meanSquaredError(logits, tf.tensor(tests.model_sort.logits)).arraySync()
     expect(mse).toBeLessThan(1e-6)
-    const outputs = generate(model, tests.model_sort.inputs, 6)
-        .arraySync()[0]
-        .slice(6)
+
+    // Async generation
+    let outputs = await generate(model, tests.model_sort.inputs, { maxNewTokens: 6 })
+    outputs = await outputs.array()
+    outputs = outputs[0].slice(6)
     outputs.forEach((o, i) => {
         expect(o).toBe(tests.model_sort.outputs[0][i])
     })
+
+    // Sync generation
+    outputs = generateSync(model, tests.model_sort.inputs, { maxNewTokens: 6 })
+    outputs = outputs.arraySync()[0].slice(6)
+    outputs.forEach((o, i) => {
+        expect(o).toBe(tests.model_sort.outputs[0][i])
+    })
+
+    // Sync generation (sampling)
+    outputsSample = generateSync(model, tests.model_sort.inputs, { maxNewTokens: 6, temperature: 0.1, doSample: true })
+    outputsSample = outputsSample.arraySync()[0].slice(6)
+    let nErrors = 0
+    outputsSample.forEach((o, i) => {
+        if (o != tests.model_sort.outputs[0][i]) {
+            nErrors += 1
+        }
+    })
+    expect(6 - nErrors).toBeLessThan(5)
 })
 
 test('Save / load', async () => {
@@ -198,8 +218,8 @@ test('Train', async () => {
     await gpt.train(train_dataset, {epochs: 10, verbose: false}) // Expect this API to change
     const inputs = [2, 2, 2, 1, 0, 1]
     const inputsSorted = inputs.sort()
-    const idx = gpt.generate([inputs], 6)
-    const outputs = idx.arraySync()[0].slice(6)
+    const idx = await gpt.generate([inputs], { maxNewTokens: 6 })
+    const outputs = (await idx.array())[0].slice(6)
     outputs.forEach((o, i) => {
         expect(o).toBe(inputsSorted[i])
     })

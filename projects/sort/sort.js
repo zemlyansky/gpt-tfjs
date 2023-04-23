@@ -5,7 +5,6 @@ const tf = require('@tensorflow/tfjs-node')
 const { model, train, optimizers, utils } = require('../../')
 
 const config = {
-  modelType: 'gpt-nano',
   nLayer: 3,
   nHead: 3,
   nEmbd: 48,

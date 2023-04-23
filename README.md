@@ -22,7 +22,7 @@ const config = {
   const gpt = GPTLMHeadModel(config)
   await gpt.train(trainDataset, {epochs: 10, verbose: true})
   const inputs = [2, 2, 2, 1, 0, 1]
-  const idx = gpt.generate([inputs], 6)
+  const idx = await gpt.generate([inputs], { maxNewTokens: 6 }) // Or gpt.generateSync(..., {...})
   console.log(idx.arraySync()[0].slice(6)) // [0, 1, 1, 2, 2, 2]
 })()
 ```

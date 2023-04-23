@@ -381,6 +381,26 @@ function GPT(conf) {
         tokEmb: true,
         lmHead: true,
     }
+    const configModels = {
+        'gpt2': { nLayer: 12, nHead: 12, nEmbd: 768, vocabSize: 50257, blockSize: 1024 },
+        'gpt2-medium': { nLayer: 24, nHead: 16, nEmbd: 1024, vocabSize: 50257, blockSize: 1024 },
+        'gpt2-large': { nLayer: 36, nHead: 20, nEmbd: 1280, vocabSize: 50257, blockSize: 1024 },
+        'gpt2-xl': { nLayer: 48, nHead: 25, nEmbd: 1600, vocabSize: 50257, blockSize: 1024 },
+        'gpt-mini': { nLayer: 6, nHead: 6, nEmbd: 192 },
+        'gpt-micro': { nLayer: 4, nHead: 4, nEmbd: 128 },
+        'gpt-nano': { nLayer: 3, nHead: 3, nEmbd: 48 },
+    }
+    // Check if modelType is present in conf
+    if (conf.modelType) {
+        // If so, check if it's valid
+        if (!Object.keys(configModels).includes(conf.modelType)) {
+            throw new Error(`Invalid modelType: ${conf.modelType}`)
+        }
+        // If valid, merge modelConfig with configDefaults
+        const modelConfig = configModels[conf.modelType]
+        Object.assign(configDefaults, modelConfig)
+    }
+
     const config = Object.assign({}, configDefaults, conf)
 
     const inputs = tf.input({shape: [null]})
@@ -438,55 +458,91 @@ function GPT(conf) {
     return tf.model({inputs: inputs, outputs: x})
 }
 
-function generate(model, idx, maxNewTokens, temperature=1.0, doSample=false, topK=null) {
-    const block_size = model.inputs[0].shape[1]
+const defaultGenerateConfig = {
+    maxNewTokens: 20,
+    temperature: 1.0,
+    doSample: false,
+    topK: null,
+}
 
-    // Check if idx is a tensor or an array
-    if (idx instanceof tf.Tensor) {
-        idx = idx.clone()
-    } else {
-        idx = tf.tensor(idx)
-    }
-    // Check data type
-    if (idx.dtype !== 'int32') {
-        idx = idx.toInt()
-    }
+function prepareIdx(idx) {
+    tf.tidy(() => {
+        // Check if idx is a tensor or an array
+        if (idx instanceof tf.Tensor) {
+            idx = idx.clone()
+        } else {
+            idx = tf.tensor(idx)
+        }
+        // Check data type
+        if (idx.dtype !== 'int32') {
+            idx = idx.toInt()
+        }
+        // If the shape of idx is 1D, we need to add a dimension
+        if (idx.shape.length === 1) {
+            idx = idx.expandDims(0)
+        }
+        tf.keep(idx)
+        // keep idx from deletion
+    })
+    return idx
+}
 
-    // If the shape of idx is 1D, we need to add a dimension
-    if (idx.shape.length === 1) {
-        idx = idx.expandDims(0)
-    }
-    
-    for (let step = 0; step < maxNewTokens; step++) {
-        // If the sequence context is growing too long we must crop it at block_size
+function generateOnce(model, idx, config) {
+    let idxNext
+    let timePerToken = performance.now()
+    tf.tidy(() => {
+        const block_size = model.inputs[0].shape[1]
         const idxCond = idx.shape[1] <= block_size ? idx : idx.slice([0, -block_size], [-1, -1])
-        
         // Forward the model to get the logits for the index in the sequence
         const logits = model.predict(idxCond)
-        
+        timePerToken = performance.now() - timePerToken
         // pluck the logits at the final step and scale by desired temperature
         const logitsScaled = logits
             .slice([0, idx.shape[1] - 1, 0])
             .reshape([logits.shape[0], logits.shape[2]])
-            .div(tf.scalar(temperature))
-        
+            .div(tf.scalar(config.temperature))
         // TODO: topK sampling
-            
         // apply softmax to convert logits to (normalized) probabilities
-        const probs = logitsScaled.softmax(-1);
-        
+        const probs = logitsScaled.softmax(-1)
         // either sample from the distribution or take the most likely element
-        let idxNext;
-        if (doSample) {
-            idxNext = tf.multinomial(probs, 1);
+        if (config.doSample) {
+            idxNext = tf.multinomial(probs, 1)
         } else {
-            idxNext = probs.argMax(-1);
+            idxNext = probs.argMax(-1)
+            idxNext = idxNext.expandDims(1)
         }
-        idxNext = idxNext.expandDims(1);
-        idx = idx.concat(idxNext, 1);
+        tf.keep(idxNext)
+    })
+    return {
+        idxNext,
+        timePerToken
     }
-    
-    return idx;
+}
+
+function generateSync(model, idx, conf, callback) {
+    const config = Object.assign({}, defaultGenerateConfig, conf)
+    idx = prepareIdx(idx)
+    for (let step = 0; step < config.maxNewTokens; step++) {
+        const { idxNext, timePerToken } = generateOnce(model, idx, config)
+        idx = idx.concat(idxNext, 1);
+        if (callback) {
+            callback({ idxNext: idxNext, timePerToken: timePerToken });
+        }
+    }
+    return idx
+}
+
+async function generate(model, idx, conf, callback) {
+    const config = Object.assign({}, defaultGenerateConfig, conf)
+    idx = await prepareIdx(idx)
+    for (let step = 0; step < config.maxNewTokens; step++) {
+        const { idxNext, timePerToken } = generateOnce(model, idx, config)
+        idx = idx.concat(idxNext, 1);
+        if (callback) {
+            await callback({ idxNext: idxNext, timePerToken: timePerToken })
+        }
+    }
+    return idx
 }
 
 const GPTModel = config => new GPTModel_(config)
@@ -523,8 +579,12 @@ class GPTLMHeadModel_ extends GPTModel_ {
         await train(this.model, dataset, config)
     }
 
-    generate() {
-        return generate(this.model, ...arguments)
+    async generate() {
+        return await generate(this.model, ...arguments)
+    }
+
+    generateSync() {
+        return generateSync(this.model, ...arguments)
     }
 }
 
@@ -537,5 +597,5 @@ module.exports = {
     GPT,
     GPTModel,
     GPTLMHeadModel,
-    generate,
+    generate, generateSync
 }
