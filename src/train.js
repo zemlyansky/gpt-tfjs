@@ -42,7 +42,7 @@ async function train (model, ds, config) {
         })
         var opt = new AdamW(config.lr, config.weightDecay, includeInWeightDecay, excludeFromWeightDecay)
     } else {
-        var opt = tf.train.adam(6e-4)
+        var opt = tf.train.adam(config.lr)
     }
 
     let epoch = 1
