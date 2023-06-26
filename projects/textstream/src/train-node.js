@@ -13,7 +13,7 @@ const { model, train, optimizers, utils } = require('../../../')
 function createDatasetFromPaths (paths, blockSize) {
     paths = Array.isArray(paths) ? paths : [paths]
     function getStreams () {
-        return paths.map(path => fs.createReadStream(path, { encoding: 'utf8', highWaterMark: 128 }))
+        return paths.map(path => fs.createReadStream(path, { encoding: 'utf8', highWaterMark: 256 }))
     }
     return createDatasetFromTextStreams(getStreams, blockSize)
 }
@@ -40,8 +40,9 @@ async function trainStream () {
     }
     const gpt = model.GPTLMHeadModel(config)
 
-    const filePath = path.join(__dirname, '../wikitext-103-raw/wiki.train.raw');
-    const train_dataset = createDatasetFromPaths(filePath, 10).batch(1)
+    const filePath = path.join(__dirname, '../data/wiki.train.raw');
+    const train_dataset = createDatasetFromPaths(filePath, blockSize)
+    let timeNow = Date.now()
 
     const callback = async (m, loss, iteration) => {
       // Calculate time diff
