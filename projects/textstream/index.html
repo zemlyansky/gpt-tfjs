@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Textstream</title>
+</head>
+<body>
+    <!-- File input that calls handle() on change -->
+    <input type="file" id="input">
+    <div>
+        <canvas id="plot"></canvas>
+    </div>
+    <p id="info"></p>
+    <p id="output"></p>
+    <!-- Plotting -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    
+    <!-- Tensorflow -->
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest"></script>
+    <script> console.log('TF backend (initial):', tf.getBackend()) </script>
+
+    <!-- CPU -->
+    <!-- <script> tf.setBackend('cpu').then(() => { console.log('TF backend (updated):', tf.getBackend()) }) </script> -->
+
+    <!-- WebGL -->
+    <!-- <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-backend-webgl"></script>  -->
+    <!-- <script> tf.setBackend('webgl').then(() => { console.log('TF backend (updated):', tf.getBackend()) }) </script> -->
+
+    <!-- WebGPU -->
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-backend-webgpu/dist/tf-backend-webgpu.js"></script>
+    <script> tf.setBackend('webgpu').then(() => { console.log('TF backend (updated):', tf.getBackend()) }) </script>
+    
+    <!-- WebAssembly -->
+    <!-- <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-backend-wasm@latest/dist/tf-backend-wasm.js"></script> -->
+    <!-- <script> tf.setBackend('wasm').then(() => { console.log('TF backend (updated):', tf.getBackend()) }) </script> -->
+
+    <script src="dist/bundle.js"></script>
+</body>
+</html>
