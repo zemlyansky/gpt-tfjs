@@ -524,12 +524,18 @@ function generateSync(model, idx, conf, callback) {
     idx = prepareIdx(idx)
     for (let step = 0; step < config.maxNewTokens; step++) {
         const { idxNext, timePerToken } = generateOnce(model, idx, config)
-        idx = idx.concat(idxNext, 1);
+        const idxNew = idx.concat(idxNext, 1)
+        tf.dispose(idx)
+        idx = idxNew
+        const idxNextArr = idxNext.arraySync()
+        tf.dispose(idxNext)
         if (callback) {
-            callback({ idxNext: idxNext, timePerToken: timePerToken });
+            callback({ idxNext: idxNextArr, timePerToken: timePerToken });
         }
     }
-    return idx
+    const idxArr = idx.arraySync()
+    tf.dispose(idx)
+    return idxArr
 }
 
 async function generate(model, idx, conf, callback) {
@@ -537,12 +543,18 @@ async function generate(model, idx, conf, callback) {
     idx = await prepareIdx(idx)
     for (let step = 0; step < config.maxNewTokens; step++) {
         const { idxNext, timePerToken } = generateOnce(model, idx, config)
-        idx = idx.concat(idxNext, 1);
+        const idxNew = idx.concat(idxNext, 1)
+        tf.dispose(idx)
+        idx = idxNew
+        const idxNextArr = await idxNext.array()
+        tf.dispose(idxNext)
         if (callback) {
-            await callback({ idxNext: idxNext, timePerToken: timePerToken })
+            await callback({ idxNext: idxNextArr, timePerToken: timePerToken })
         }
     }
-    return idx
+    const idxArr = await idx.array()
+    tf.dispose(idx)
+    return idxArr
 }
 
 const GPTModel = config => new GPTModel_(config)
