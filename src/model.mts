@@ -460,9 +460,9 @@ interface GPTConfig extends BlockConfig {
   debug?: boolean;
   tokEmb?: boolean;
   lmHead?: boolean;
-  embdDrop: number;
-  nLayer: number;
-  modelType?:
+  embdDrop?: number;
+  nLayer?: number;
+  modelType:
     | "gpt2"
     | "gpt2-medium"
     | "gpt2-large"
@@ -472,7 +472,7 @@ interface GPTConfig extends BlockConfig {
     | "gpt-nano";
 }
 
-export function GPT(conf: GPTConfig): tf.LayersModel {
+export function GPT(conf: Partial<GPTConfig>): tf.LayersModel {
   const configDefaults = {
     name: "transformer",
     bias: true,
@@ -509,9 +509,27 @@ export function GPT(conf: GPTConfig): tf.LayersModel {
       vocabSize: 50257,
       blockSize: 1024,
     },
-    "gpt-mini": { nLayer: 6, nHead: 6, nEmbd: 192 },
-    "gpt-micro": { nLayer: 4, nHead: 4, nEmbd: 128 },
-    "gpt-nano": { nLayer: 3, nHead: 3, nEmbd: 48 },
+    "gpt-mini": {
+      nLayer: 6,
+      nHead: 6,
+      nEmbd: 192,
+      vocabSize: 50257,
+      blockSize: 1024,
+    },
+    "gpt-micro": {
+      nLayer: 4,
+      nHead: 4,
+      nEmbd: 128,
+      vocabSize: 50257,
+      blockSize: 1024,
+    },
+    "gpt-nano": {
+      nLayer: 3,
+      nHead: 3,
+      nEmbd: 48,
+      vocabSize: 50257,
+      blockSize: 1024,
+    },
   };
   // Check if modelType is present in conf
   if (conf.modelType) {
@@ -524,7 +542,7 @@ export function GPT(conf: GPTConfig): tf.LayersModel {
     Object.assign(configDefaults, modelConfig);
   }
 
-  const config = Object.assign({}, configDefaults, conf);
+  const config = Object.assign({}, configDefaults, conf) as Required<GPTConfig>;
 
   const inputs = tf.input({ shape: [null] });
 
@@ -532,8 +550,8 @@ export function GPT(conf: GPTConfig): tf.LayersModel {
     ? tf.layers
         .embedding({
           name: config.name + "/wte",
-          inputDim: config.vocabSize,
-          outputDim: config.nEmbd,
+          inputDim: config.vocabSize as number,
+          outputDim: config.nEmbd as number,
           embeddingsInitializer: "zeros",
         })
         .apply(inputs)
@@ -543,8 +561,8 @@ export function GPT(conf: GPTConfig): tf.LayersModel {
   let posEmb = tf.layers
     .embedding({
       name: config.name + "/wpe",
-      inputDim: config.blockSize,
-      outputDim: config.nEmbd,
+      inputDim: config.blockSize as number,
+      outputDim: config.nEmbd as number,
       embeddingsInitializer: "zeros",
     })
     .apply(range);
@@ -557,14 +575,14 @@ export function GPT(conf: GPTConfig): tf.LayersModel {
   x = tf.layers
     .dropout({
       name: "drop",
-      rate: config.embdDrop,
+      rate: config.embdDrop as number,
     })
     .apply(x);
   if (config.debug) {
     x = new LogLayer({ name: "dropadd" }).apply(x);
   }
 
-  for (let i = 0; i < config.nLayer; i++) {
+  for (let i = 0; i < (config.nLayer as number); i++) {
     x = Block(
       Object.assign({}, config, { name: config.name + "/h/" + i }),
     ).apply(x);
@@ -602,7 +620,7 @@ const defaultGenerateConfig: GPTLMHeadModelGenerateConfig = {
   topK: 1,
 };
 
-function prepareIdx(idx: tf.Tensor): tf.Tensor {
+function prepareIdx(idx: number[] | tf.Tensor): tf.Tensor {
   tf.tidy(() => {
     // Check if idx is a tensor or an array
     if (idx instanceof tf.Tensor) {
@@ -621,7 +639,7 @@ function prepareIdx(idx: tf.Tensor): tf.Tensor {
     tf.keep(idx);
     // keep idx from deletion
   });
-  return idx;
+  return idx as tf.Tensor;
 }
 
 function generateOnce(
@@ -668,7 +686,7 @@ export function generateSync(
   model: tf.LayersModel,
   idx: tf.Tensor,
   conf: GPTLMHeadModelGenerateConfig,
-  callback: (data: GPTLMHeadModelGenerateCallbackData) => void,
+  callback?: (data: GPTLMHeadModelGenerateCallbackData) => void,
 ) {
   const config = Object.assign({}, defaultGenerateConfig, conf);
   idx = prepareIdx(idx);
@@ -690,15 +708,15 @@ export function generateSync(
 
 export async function generate(
   model: tf.LayersModel,
-  idx: tf.Tensor,
+  idx: number[] | tf.Tensor,
   conf: GPTLMHeadModelGenerateConfig,
-  callback: (data: GPTLMHeadModelGenerateCallbackData) => void,
+  callback?: (data: GPTLMHeadModelGenerateCallbackData) => void,
 ) {
   const config = Object.assign({}, defaultGenerateConfig, conf);
   idx = prepareIdx(idx);
   for (let step = 0; step < config.maxNewTokens; step++) {
     const { idxNext, timePerToken } = generateOnce(model, idx, config);
-    const idxNew = idx.concat(idxNext, 1);
+    const idxNew = idx.concat(idxNext, 1) as tf.Tensor;
     tf.dispose(idx);
     idx = idxNew;
     const idxNextArr = (await idxNext.array()) as number[];
@@ -709,7 +727,7 @@ export async function generate(
   }
   const idxArr = await idx.array();
   tf.dispose(idx);
-  return idxArr as number[];
+  return idxArr as number[][];
 }
 
 class GPTModel_ {
@@ -767,14 +785,14 @@ export class GPTLMHeadModel extends GPTModel_ {
   async generate(
     config: GPTLMHeadModelGenerateConfig,
     callback?: GPTLMHeadModelGenerateCallback,
-  ): Promise<number[]> {
+  ): Promise<number[][]> {
     return await generate(this.model, null, config, callback);
   }
 
   generateSync(
     config: GPTLMHeadModelGenerateConfig,
     callback?: GPTLMHeadModelGenerateCallback,
-  ): number[] {
+  ): number[][] {
     return generateSync(this.model, null, config, callback);
   }
 }

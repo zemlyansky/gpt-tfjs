@@ -24,7 +24,7 @@ export function convertMinGPTConfig(config) {
 }
 
 export function convertMinGPTWeights(weights) {
-  const newWeights = {};
+  const newWeights: { [key: string]: tf.Tensor } = {};
   for (const wn in weights) {
     const w = weights[wn];
     let wt = tf.tensor(w);
