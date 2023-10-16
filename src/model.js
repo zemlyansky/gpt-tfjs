@@ -419,7 +419,7 @@ function GPT(conf) {
 
     const range = Range()
         .apply(inputs)
-    const posEmb = tf.layers.embedding({
+    let posEmb = tf.layers.embedding({
             name: config.name + '/wpe',
             inputDim: config.blockSize,
             outputDim: config.nEmbd,
